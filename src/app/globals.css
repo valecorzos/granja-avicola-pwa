@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/* =============================================
+   DARK MODE via clase .dark en <html>
+   Tailwind v4: se configura con @custom-variant
+   ============================================= */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* =============================================
+   VARIABLES DE TEMA — MODO CLARO (default)
+   ============================================= */
+:root {
+  --background: #EDEDED;
+  --foreground: #1e2e5a;
+  --surface: #ffffff;
+  --surface-2: #f0f5fa;
+  --border: #CECECE;
+  --muted: #526085;
+  --accent: #1067f2;
+  --accent-hover: #0c328f;
+
+  /* Scrollbar */
+  --scrollbar-track: #EDEDED;
+  --scrollbar-thumb: #CECECE;
+  --scrollbar-thumb-hover: #1067f2;
+}
+
+/* =============================================
+   VARIABLES DE TEMA — MODO OSCURO
+   ============================================= */
+.dark {
+  --background: #111a36;
+  --foreground: #f8fafc;
+  --surface: #1e2e5a;
+  --surface-2: #0c328f;
+  --border: #2e3f6d;
+  --muted: #a0c1df;
+  --accent: #1067f2;
+  --accent-hover: #3b82f6;
+
+  /* Scrollbar */
+  --scrollbar-track: #111a36;
+  --scrollbar-thumb: #0c328f;
+  --scrollbar-thumb-hover: #1067f2;
+}
+
+/* =============================================
+   ESTILOS BASE
+   ============================================= */
+@theme inline {
+  --font-title: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Open Sauce", "Open Sauce Sans", "Open Sauce One", "Open Sans", var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* =============================================
+   SCROLLBAR PERSONALIZADO
+   ============================================= */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* =============================================
+   UTILIDADES PARA TOKENS DE TEMA
+   ============================================= */
+.bg-surface    { background-color: var(--surface); }
+.bg-surface-2  { background-color: var(--surface-2); }
+.border-theme  { border-color: var(--border); }
+.text-muted    { color: var(--muted); }
+.text-theme    { color: var(--foreground); }
+.font-title    { font-family: var(--font-title); }
