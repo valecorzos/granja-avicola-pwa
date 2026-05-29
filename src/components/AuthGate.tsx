@@ -3,7 +3,7 @@
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, ReactNode } from 'react';
-import Navbar from '@/components/Navbar';
+import AppShell from '@/components/AppShell';
 
 const PUBLIC_ROUTES = ['/login'];
 
@@ -27,7 +27,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
            style={{ backgroundColor: 'var(--background)' }}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-[#1067f2] border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Cargando sesión...</p>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Cargando...</p>
         </div>
       </div>
     );
@@ -43,13 +43,10 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     return null;
   }
 
-  // Usuario autenticado → mostrar Navbar + contenido
+  // Usuario autenticado → mostrar AppShell + contenido
   return (
-    <>
-      <Navbar />
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8">
-        {children}
-      </main>
-    </>
+    <AppShell>
+      {children}
+    </AppShell>
   );
 }

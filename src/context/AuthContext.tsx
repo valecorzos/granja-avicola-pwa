@@ -40,7 +40,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    setLoading(true);
     try {
       if (!navigator.onLine) {
         // Modo offline: verificar credenciales guardadas localmente
@@ -50,7 +49,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (storedUser.email === email) {
             setUser({ ...storedUser, isOffline: true });
             setIsOffline(true);
-            setLoading(false);
             return;
           }
         }
@@ -70,10 +68,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('auth_user', JSON.stringify(newUser));
       setIsOffline(false);
     } catch (e) {
-      setLoading(false);
       throw e; // Re-lanzar para que el formulario muestre el error
     }
-    setLoading(false);
   };
 
   const logout = () => {

@@ -22,6 +22,11 @@ export const metadata: Metadata = {
   title: 'Granja Avícola — Control Operativo',
   description: 'Sistema PWA 100% offline para operaciones logísticas avícolas · Alimentos Serex',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/isotipo_serex.png',
+    shortcut: '/isotipo_serex.png',
+    apple: '/isotipo_serex.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

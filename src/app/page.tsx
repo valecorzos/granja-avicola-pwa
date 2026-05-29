@@ -6,7 +6,7 @@ import { dbLocal } from '@/lib/db-local';
 import { useAuth } from '@/context/AuthContext';
 
 export default function DashboardPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     totalLotes: 0,
     lotesActivos: 0,
@@ -49,7 +49,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header con bienvenida y botón logout */}
+      {/* Header con bienvenida */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-3xl font-title font-extrabold tracking-tight text-slate-800 dark:text-slate-100">
@@ -59,12 +59,6 @@ export default function DashboardPage() {
             Bienvenido, <span className="font-title font-bold text-[#1067f2] dark:text-[#a0c1df]">{user?.email}</span>
           </p>
         </div>
-        <button
-          onClick={logout}
-          className="px-4 py-2 text-sm font-title font-semibold rounded-lg bg-slate-100 dark:bg-[#0c328f]/40 border border-theme text-slate-700 dark:text-slate-300 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-700 transition-all cursor-pointer"
-        >
-          Cerrar Sesión
-        </button>
       </div>
 
       {/* Grid de Estadísticas */}

@@ -26,24 +26,38 @@
 }
 
 /* =============================================
-   VARIABLES DE TEMA — MODO OSCURO
+   VARIABLES DE TEMA — MODO OSCURO (REVISADO)
    ============================================= */
 .dark {
-  --background: #111a36;
-  --foreground: #f8fafc;
-  --surface: #1e2e5a;
-  --surface-2: #0c328f;
-  --border: #2e3f6d;
-  --muted: #a0c1df;
-  --accent: #1067f2;
-  --accent-hover: #3b82f6;
+  /* Fondo general de la pantalla, gradiente más profundo y neutro */
+  --background: #0a0e1c; /* Un azul carbón muy profundo, casi negro */
+  
+  /* Texto principal, nítido y suave */
+  --foreground: #e8eaed; /* Un blanco neutro suave, menos azulado */
+  
+  /* Tarjeta de superficie principal, oscura y neutra */
+  --surface: #11151e; /* Gris carbón oscuro profundo, para la tarjeta de login */
+  
+  /* Campos de entrada, más oscuros para profundidad */
+  --surface-2: #090b11; /* Carbón más oscuro que la tarjeta, para inputs */
+  
+  /* Bordes de inputs y líneas divisorias, sutiles */
+  --border: #2c3245; /* Gris carbón medio, sutilmente azulado */
+  
+  /* Texto secundario y etiquetas, legibles pero atenuados */
+  --muted: #8a92a6; /* Gris medio neutro, sin tono azul */
+  
+  /* Color de acento para botones, el azul vibrante */
+  --accent: #1067f2; /* Azul eléctrico (vibrante como el original) */
+  
+  /* Hover del acento, un tono ligeramente diferente o más claro */
+  --accent-hover: #3b82f6; /* Azul brillante, aceptable */
 
   /* Scrollbar */
-  --scrollbar-track: #111a36;
-  --scrollbar-thumb: #0c328f;
+  --scrollbar-track: #0a0e1c;
+  --scrollbar-thumb: #2c3245;
   --scrollbar-thumb-hover: #1067f2;
 }
-
 /* =============================================
    ESTILOS BASE
    ============================================= */
@@ -93,3 +107,7 @@ body {
 .text-muted    { color: var(--muted); }
 .text-theme    { color: var(--foreground); }
 .font-title    { font-family: var(--font-title); }
+
+/* Safe area helpers para móviles con muescas y barras de estado */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }

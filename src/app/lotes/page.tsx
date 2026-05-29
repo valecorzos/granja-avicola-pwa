@@ -196,7 +196,7 @@ export default function LotesPage() {
                   value={form.ubicacion}
                   onChange={(e) => setForm({ ...form, ubicacion: e.target.value })}
                   className="w-full bg-surface-2 border border-theme rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#1067f2] focus:border-transparent transition-all"
-                  placeholder="Ej. Sector Sur"
+                  placeholder="Ej. Puerto Rico"
                   required
                 />
               </div>
@@ -209,7 +209,7 @@ export default function LotesPage() {
                   value={form.galpon}
                   onChange={(e) => setForm({ ...form, galpon: e.target.value })}
                   className="w-full bg-surface-2 border border-theme rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#1067f2] focus:border-transparent transition-all"
-                  placeholder="Ej. Galpón 2"
+                  placeholder="Ej. 2"
                   required
                 />
               </div>
