@@ -87,7 +87,7 @@ export default function AppShell({ children }: AppShellProps) {
       ),
     },
     {
-      name: 'Maestro Lotes',
+      name: 'Recepción Cría',
       href: '/lotes',
       icon: (active: boolean) => (
         <svg
@@ -110,7 +110,7 @@ export default function AppShell({ children }: AppShellProps) {
       ),
     },
     {
-      name: 'Cría y Levante',
+      name: 'Diario Cría',
       href: '/cria-levante',
       icon: (active: boolean) => (
         <svg
@@ -125,6 +125,63 @@ export default function AppShell({ children }: AppShellProps) {
           strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+        </svg>
+      ),
+    },
+    {
+      name: 'Recep. Prod.',
+      href: '/produccion/lotes',
+      icon: (active: boolean) => (
+        <svg
+          className={`w-6 h-6 transition-colors duration-200 ${
+            active
+              ? 'text-[#1067f2] dark:text-[#a0c1df]'
+              : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+        </svg>
+      ),
+    },
+    {
+      name: 'Diario Prod.',
+      href: '/produccion/diario',
+      icon: (active: boolean) => (
+        <svg
+          className={`w-6 h-6 transition-colors duration-200 ${
+            active
+              ? 'text-[#1067f2] dark:text-[#a0c1df]'
+              : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      ),
+    },
+    {
+      name: 'Incubación',
+      href: '/produccion/incubacion',
+      icon: (active: boolean) => (
+        <svg
+          className={`w-6 h-6 transition-colors duration-200 ${
+            active
+              ? 'text-[#1067f2] dark:text-[#a0c1df]'
+              : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'
+          }`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" />
         </svg>
       ),
     },
