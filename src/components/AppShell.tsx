@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { sincronizarDatos } from '@/lib/sync';
+import SyncButton from '@/components/SyncButton';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -398,6 +399,9 @@ export default function AppShell({ children }: AppShellProps) {
           {children}
         </main>
       </div>
+
+      {/* Botón flotante de sincronización con la base de datos */}
+      <SyncButton />
 
     </div>
   );

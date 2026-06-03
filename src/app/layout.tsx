@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AuthProvider } from '@/context/AuthContext';
 import AuthGate from '@/components/AuthGate';
+import { ToastProvider } from '@/components/Toast';
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -51,10 +52,12 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col">
         <ThemeProvider>
           <AuthProvider>
-            {/* AuthGate maneja Navbar, redirección y spinner — Navbar NO va aquí */}
-            <AuthGate>
-              {children}
-            </AuthGate>
+            <ToastProvider>
+              {/* AuthGate maneja Navbar, redirección y spinner — Navbar NO va aquí */}
+              <AuthGate>
+                {children}
+              </AuthGate>
+            </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

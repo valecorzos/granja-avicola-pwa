@@ -97,6 +97,21 @@ export interface SalidasIncubacionLocal {
   actualizado_en: string;
 }
 
+// ─── MAESTRO: GRANJAS Y GALPONES (caché local del maestro de Supabase) ───────
+
+export interface GranjaLocal {
+  id: string;
+  nombre: string;
+  activo: boolean;
+}
+
+export interface GalponLocal {
+  id: string;
+  granja_id: string;
+  nombre: string;
+  activo: boolean;
+}
+
 class GranjaAvicolaDatabase extends Dexie {
   recepcion_cria!: Table<RecepcionCriaLocal>;
   diario_cria!: Table<DiarioCriaLocal>;
@@ -104,6 +119,8 @@ class GranjaAvicolaDatabase extends Dexie {
   diario_huevos!: Table<DiarioHuevosLocal>;
   diario_aves_prod!: Table<DiarioAvesProdLocal>;
   salidas_incubacion!: Table<SalidasIncubacionLocal>;
+  granjas!: Table<GranjaLocal>;
+  galpones!: Table<GalponLocal>;
 
   constructor() {
     super('GranjaAvicolaDB');
@@ -125,6 +142,12 @@ class GranjaAvicolaDatabase extends Dexie {
       diario_huevos: 'id_local, id, lote_id_local, lote_id, fecha, estado_sync',
       diario_aves_prod: 'id_local, id, lote_id_local, lote_id, fecha, sexo, estado_sync',
       salidas_incubacion: 'id_local, id, lote_id_local, lote_id, fecha, estado_sync',
+    });
+
+    // v3: caché local del maestro de granjas/galpones
+    this.version(3).stores({
+      granjas: 'id, nombre',
+      galpones: 'id, granja_id, nombre',
     });
   }
 }

@@ -3,10 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { dbLocal, type RecepcionCriaLocal } from '@/lib/db-local';
 import { sincronizarDatos } from '@/lib/sync';
-import { MAESTRO_GRANJAS } from '@/lib/granjas-config';
+import type { GranjaConfig } from '@/lib/granjas-config';
+import { useMaestroGranjas } from '@/lib/maestro';
 import DatePickerVE from '@/components/DatePickerVE';
 import SelectVE from '@/components/SelectVE';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/components/Toast';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -201,17 +203,19 @@ function DeleteConfirmModal({
 
 function EditModal({
   lote,
+  granjas,
   onSave,
   onCancel,
 }: {
   lote: RecepcionCriaLocal;
+  granjas: GranjaConfig[];
   onSave: (data: Partial<RecepcionCriaLocal>) => void;
   onCancel: () => void;
 }) {
   const granjaId =
-    MAESTRO_GRANJAS.find((g) => g.nombre === lote.granja)?.id ?? '';
+    granjas.find((g) => g.nombre === lote.granja)?.id ?? '';
   const galponId =
-    MAESTRO_GRANJAS.find((g) => g.nombre === lote.granja)
+    granjas.find((g) => g.nombre === lote.granja)
       ?.galpones.find((gp) => gp.nombre === lote.galpon)?.id ?? '';
 
   const [form, setForm] = useState({
@@ -223,7 +227,7 @@ function EditModal({
     cant_machos: String(lote.cant_machos),
   });
 
-  const granjaSeleccionada = MAESTRO_GRANJAS.find((g) => g.id === form.granja);
+  const granjaSeleccionada = granjas.find((g) => g.id === form.granja);
   const galpones = granjaSeleccionada?.galpones ?? [];
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -257,7 +261,7 @@ function EditModal({
             <SelectVE
               value={form.granja}
               onChange={(v) => setForm({ ...form, granja: v, galpon: '' })}
-              options={MAESTRO_GRANJAS.map((g) => ({ value: g.id, label: g.nombre }))}
+              options={granjas.map((g) => ({ value: g.id, label: g.nombre }))}
               placeholder="Buscar granja..."
               searchable
             />
@@ -336,10 +340,11 @@ function EditModal({
 
 export default function RecepcionCriaPage() {
   const { user } = useAuth();
+  const toast = useToast();
+  const { granjas } = useMaestroGranjas();
   const [lotes, setLotes] = useState<RecepcionCriaLocal[]>([]);
   const [form, setForm] = useState<FormState>(FORM_DEFAULT);
   const [loading, setLoading] = useState(false);
-  const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
 
   // fix #5: estado para edición y borrado
   const [editLote, setEditLote] = useState<RecepcionCriaLocal | null>(null);
@@ -349,7 +354,7 @@ export default function RecepcionCriaPage() {
   const [granjasFiltro, setGranjasFiltro] = useState<string[]>([]);
   const [showFilter, setShowFilter] = useState(false);
 
-  const granjaSeleccionada = MAESTRO_GRANJAS.find((g) => g.id === form.granja);
+  const granjaSeleccionada = granjas.find((g) => g.id === form.granja);
   const galpones = granjaSeleccionada?.galpones ?? [];
 
   const cargarLotes = async () => {
@@ -362,9 +367,8 @@ export default function RecepcionCriaPage() {
     }
   };
 
-  const mostrarMensaje = (texto: string, tipo: string) => {
-    setMensaje({ texto, tipo });
-    setTimeout(() => setMensaje({ texto: '', tipo: '' }), 4000);
+  const mostrarMensaje = (texto: string, tipo: 'success' | 'error' | 'info' | 'warning') => {
+    toast.notify(texto, tipo);
   };
 
   const guardarLote = async (e: React.FormEvent) => {
@@ -429,6 +433,8 @@ export default function RecepcionCriaPage() {
   const handleDeleteConfirm = async () => {
     if (!dbLocal || !deleteId) return;
     try {
+      // Borrar también los registros diarios hijos para no dejar huérfanos.
+      await dbLocal.diario_cria.where('lote_id_local').equals(deleteId).delete();
       await dbLocal.recepcion_cria.delete(deleteId);
       setDeleteId(null);
       mostrarMensaje('Lote eliminado.', 'success');
@@ -466,6 +472,7 @@ export default function RecepcionCriaPage() {
       {editLote && (
         <EditModal
           lote={editLote}
+          granjas={granjas}
           onSave={handleEditSave}
           onCancel={() => setEditLote(null)}
         />
@@ -480,19 +487,6 @@ export default function RecepcionCriaPage() {
 
       {/* Page wrapper — full height usando todo el espacio del viewport */}
       <div className="flex flex-col gap-4 md:h-[calc(100dvh-3rem)]">
-
-        {/* Toast */}
-        {mensaje.texto && (
-          <div
-            className={`flex-shrink-0 px-4 py-3 rounded-xl text-sm font-semibold border ${
-              mensaje.tipo === 'success'
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-            }`}
-          >
-            {mensaje.texto}
-          </div>
-        )}
 
         {/* Grid 2:1 — form ancho, listado más estrecho (como el mockup) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 flex-1 min-h-0">
@@ -548,7 +542,7 @@ export default function RecepcionCriaPage() {
                   <SelectVE
                     value={form.granja}
                     onChange={(v) => setForm({ ...form, granja: v, galpon: '' })}
-                    options={MAESTRO_GRANJAS.map((g) => ({ value: g.id, label: g.nombre }))}
+                    options={granjas.map((g) => ({ value: g.id, label: g.nombre }))}
                     placeholder="Buscar granja..."
                     searchable
                   />
