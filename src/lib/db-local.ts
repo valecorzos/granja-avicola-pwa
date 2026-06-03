@@ -6,10 +6,12 @@ export interface RecepcionCriaLocal {
   id_local: string;
   id: string | null;
   fecha: string;
+  granja: string;
   galpon: string;
   codigo_lote: string;
   cant_hembras: number;
   cant_machos: number;
+  usuario_email: string;
   estado_sync: 'sincronizado' | 'pendiente' | 'error';
   creado_en: string;
   actualizado_en: string;
@@ -38,11 +40,13 @@ export interface RecepcionProdLocal {
   id_local: string;
   id: string | null;
   fecha: string;
+  granja: string;
   galpon: string;
   codigo_lote: string;
   cant_hembras: number;
   machos_produccion: number;
   machos_reemplazo: number;
+  usuario_email: string;
   estado_sync: 'sincronizado' | 'pendiente' | 'error';
   creado_en: string;
   actualizado_en: string;

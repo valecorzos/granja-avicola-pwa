@@ -27,6 +27,7 @@ async function syncRecepcionCria() {
     const payload = {
       id_local: lote.id_local,
       fecha: lote.fecha,
+      granja: lote.granja,
       galpon: lote.galpon,
       codigo_lote: lote.codigo_lote,
       cant_hembras: lote.cant_hembras,
@@ -101,6 +102,7 @@ async function syncRecepcionProd() {
     const payload = {
       id_local: lote.id_local,
       fecha: lote.fecha,
+      granja: lote.granja,
       galpon: lote.galpon,
       codigo_lote: lote.codigo_lote,
       cant_hembras: lote.cant_hembras,

@@ -18,19 +18,25 @@ export default function DashboardPage() {
     if (!dbLocal) return;
 
     try {
-      const todosLotes = await dbLocal.lotes.toArray();
-      const lotesActivosCount = todosLotes.filter((l) => l.estado === 'activo').length;
+      const [lotesCria, lotesProd] = await Promise.all([
+        dbLocal.recepcion_cria.toArray(),
+        dbLocal.recepcion_prod.toArray(),
+      ]);
+      const totalLotes = lotesCria.length + lotesProd.length;
 
-      const lotesPendientes = todosLotes.filter((l) => l.estado_sync === 'pendiente').length;
-      const criaPendientes = await dbLocal.cria_levante_diario
-        .where('estado_sync')
-        .equals('pendiente')
-        .count();
+      const [criaPend, prodPend, diarioCriaPend, diarioProdPend, huevosPend, incubPend] = await Promise.all([
+        dbLocal.recepcion_cria.where('estado_sync').equals('pendiente').count(),
+        dbLocal.recepcion_prod.where('estado_sync').equals('pendiente').count(),
+        dbLocal.diario_cria.where('estado_sync').equals('pendiente').count(),
+        dbLocal.diario_aves_prod.where('estado_sync').equals('pendiente').count(),
+        dbLocal.diario_huevos.where('estado_sync').equals('pendiente').count(),
+        dbLocal.salidas_incubacion.where('estado_sync').equals('pendiente').count(),
+      ]);
 
       setStats({
-        totalLotes: todosLotes.length,
-        lotesActivos: lotesActivosCount,
-        pendientesSync: lotesPendientes + criaPendientes,
+        totalLotes,
+        lotesActivos: totalLotes,
+        pendientesSync: criaPend + prodPend + diarioCriaPend + diarioProdPend + huevosPend + incubPend,
       });
     } catch (err) {
       console.error('Error al cargar estadísticas:', err);
