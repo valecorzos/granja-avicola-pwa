@@ -12,6 +12,8 @@ export interface RecepcionCriaLocal {
   cant_hembras: number;
   cant_machos: number;
   usuario_email: string;
+  /** Estado del lote en la fase de Cría y Levante. true = Activo, false = Inactivo (cerrado). */
+  activo: boolean;
   estado_sync: 'sincronizado' | 'pendiente' | 'error';
   creado_en: string;
   actualizado_en: string;

@@ -67,6 +67,7 @@ create table if not exists public.recepcion_cria (
   cant_hembras  integer not null default 0,
   cant_machos   integer not null default 0,
   usuario_email text,
+  activo        boolean not null default true,   -- Activo / Inactivo en Cría y Levante
   creado_en     timestamptz not null default now()
 );
 
@@ -146,6 +147,7 @@ alter table public.recepcion_cria  add column if not exists granja        text;
 alter table public.recepcion_cria  add column if not exists galpon        text;
 alter table public.recepcion_cria  add column if not exists codigo_lote   text;
 alter table public.recepcion_cria  add column if not exists usuario_email text;
+alter table public.recepcion_cria  add column if not exists activo        boolean not null default true;
 
 -- ----------------------------------------------------------------------------
 --  Restricción UNIQUE en id_local (imprescindible para el upsert/onConflict).

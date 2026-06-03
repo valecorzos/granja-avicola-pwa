@@ -20,15 +20,47 @@ export async function sincronizarDatos(): Promise<ResultadoSync> {
   }
 
   try {
+    // 1) Subir lo que este dispositivo tiene pendiente.
     await syncRecepcionCria();
     await syncDiarioCria();
     await syncRecepcionProd();
     await syncDiarioHuevos();
     await syncDiarioAvesProd();
     await syncSalidasIncubacion();
+    // 2) Descargar lo que otros usuarios subieron → todos ven todo.
+    await descargarDatos();
     return 'ok';
   } catch (error) {
     console.error('Error general en sincronización:', error);
+    return 'error';
+  }
+}
+
+/**
+ * Descarga (pull) desde Supabase hacia la base local. Gracias a RLS, cualquier
+ * usuario autenticado ve TODAS las filas, así que cada dispositivo termina con
+ * el conjunto completo de registros, sin importar quién los creó.
+ *
+ * SOLO se descargan las RECEPCIONES de lotes (pocos registros, todos deben
+ * verlos para poder seleccionarlos al hacer un diario). Los DIARIOS NO se
+ * descargan: son alto volumen y funcionan como caché de solo-pendientes que se
+ * vacía al sincronizar.
+ *
+ * Regla de mezcla: nunca pisamos un registro local que esté 'pendiente' o
+ * 'error' (cambios aún sin subir). Solo escribimos filas nuevas o que ya
+ * estaban 'sincronizado' localmente.
+ */
+export async function descargarDatos(): Promise<ResultadoSync> {
+  if (typeof window === 'undefined' || !navigator.onLine) return 'sin-conexion';
+  if (!dbLocal) return 'error';
+  if (!(await asegurarSesion())) return 'sin-sesion';
+
+  try {
+    await pullRecepcionCria();
+    await pullRecepcionProd();
+    return 'ok';
+  } catch (error) {
+    console.error('Error general en descarga:', error);
     return 'error';
   }
 }
@@ -62,6 +94,15 @@ async function porSubir<T extends ConSync>(tabla: Table<T>): Promise<T[]> {
   return tabla.where('estado_sync').anyOf('pendiente', 'error').toArray();
 }
 
+/**
+ * ¿Es seguro sobrescribir el registro local con la versión remota?
+ * Solo cuando NO existe localmente o ya estaba 'sincronizado'. Si está
+ * 'pendiente'/'error', tiene cambios locales sin subir que no debemos pisar.
+ */
+function puedeSobrescribir(local: ConSync | undefined): boolean {
+  return !local || local.estado_sync === 'sincronizado';
+}
+
 // ─── MÓDULO 1: CRÍA Y LEVANTE ────────────────────────────────────────────────
 
 async function syncRecepcionCria() {
@@ -79,6 +120,7 @@ async function syncRecepcionCria() {
       cant_hembras: lote.cant_hembras,
       cant_machos: lote.cant_machos,
       usuario_email: lote.usuario_email,
+      activo: lote.activo ?? true,
     };
 
     // upsert por id_local → idempotente: inserta o actualiza sin duplicar.
@@ -141,10 +183,8 @@ async function syncDiarioCria() {
       console.error('sync diario_cria:', result.error.message);
       await db.diario_cria.update(reg.id_local, { estado_sync: 'error' });
     } else if (result.data?.[0]) {
-      await db.diario_cria.update(reg.id_local, {
-        id: result.data[0].id,
-        estado_sync: 'sincronizado',
-      });
+      // Caché de solo-pendientes: una vez en la base, se borra del dispositivo.
+      await db.diario_cria.delete(reg.id_local);
     }
   }
 }
@@ -224,10 +264,8 @@ async function syncDiarioHuevos() {
       console.error('sync diario_huevos:', result.error.message);
       await db.diario_huevos.update(reg.id_local, { estado_sync: 'error' });
     } else if (result.data?.[0]) {
-      await db.diario_huevos.update(reg.id_local, {
-        id: result.data[0].id,
-        estado_sync: 'sincronizado',
-      });
+      // Caché de solo-pendientes: una vez en la base, se borra del dispositivo.
+      await db.diario_huevos.delete(reg.id_local);
     }
   }
 }
@@ -272,10 +310,8 @@ async function syncDiarioAvesProd() {
       console.error('sync diario_aves_prod:', result.error.message);
       await db.diario_aves_prod.update(reg.id_local, { estado_sync: 'error' });
     } else if (result.data?.[0]) {
-      await db.diario_aves_prod.update(reg.id_local, {
-        id: result.data[0].id,
-        estado_sync: 'sincronizado',
-      });
+      // Caché de solo-pendientes: una vez en la base, se borra del dispositivo.
+      await db.diario_aves_prod.delete(reg.id_local);
     }
   }
 }
@@ -319,10 +355,79 @@ async function syncSalidasIncubacion() {
       console.error('sync salidas_incubacion:', result.error.message);
       await db.salidas_incubacion.update(reg.id_local, { estado_sync: 'error' });
     } else if (result.data?.[0]) {
-      await db.salidas_incubacion.update(reg.id_local, {
-        id: result.data[0].id,
-        estado_sync: 'sincronizado',
-      });
+      // Caché de solo-pendientes: una vez en la base, se borra del dispositivo.
+      await db.salidas_incubacion.delete(reg.id_local);
     }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DESCARGA (PULL): Supabase → base local. Hace que todos vean todo.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const ahoraISO = () => new Date().toISOString();
+
+// ─── MÓDULO 1: CRÍA Y LEVANTE ────────────────────────────────────────────────
+
+async function pullRecepcionCria() {
+  const db = dbLocal;
+  if (!db) return;
+  const { data, error } = await supabase.from('recepcion_cria').select('*');
+  if (error) {
+    console.error('pull recepcion_cria:', error.message);
+    return;
+  }
+
+  for (const row of data ?? []) {
+    const local = await db.recepcion_cria.get(row.id_local);
+    if (!puedeSobrescribir(local)) continue;
+    await db.recepcion_cria.put({
+      id_local: row.id_local,
+      id: row.id,
+      fecha: row.fecha,
+      granja: row.granja ?? '',
+      galpon: row.galpon ?? '',
+      codigo_lote: row.codigo_lote ?? '',
+      cant_hembras: row.cant_hembras ?? 0,
+      cant_machos: row.cant_machos ?? 0,
+      usuario_email: row.usuario_email ?? '',
+      activo: row.activo ?? true,
+      estado_sync: 'sincronizado',
+      creado_en: row.creado_en ?? local?.creado_en ?? ahoraISO(),
+      actualizado_en: local?.actualizado_en ?? row.creado_en ?? ahoraISO(),
+    });
+  }
+}
+
+// ─── MÓDULO 2: PRODUCCIÓN ─────────────────────────────────────────────────────
+
+async function pullRecepcionProd() {
+  const db = dbLocal;
+  if (!db) return;
+  const { data, error } = await supabase.from('recepcion_prod').select('*');
+  if (error) {
+    console.error('pull recepcion_prod:', error.message);
+    return;
+  }
+
+  for (const row of data ?? []) {
+    const local = await db.recepcion_prod.get(row.id_local);
+    if (!puedeSobrescribir(local)) continue;
+    await db.recepcion_prod.put({
+      id_local: row.id_local,
+      id: row.id,
+      fecha: row.fecha,
+      granja: row.granja ?? '',
+      galpon: row.galpon ?? '',
+      codigo_lote: row.codigo_lote ?? '',
+      cant_hembras: row.cant_hembras ?? 0,
+      machos_produccion: row.machos_produccion ?? 0,
+      machos_reemplazo: row.machos_reemplazo ?? 0,
+      usuario_email: row.usuario_email ?? '',
+      estado_sync: 'sincronizado',
+      creado_en: row.creado_en ?? local?.creado_en ?? ahoraISO(),
+      actualizado_en: local?.actualizado_en ?? row.creado_en ?? ahoraISO(),
+    });
+  }
+}
+

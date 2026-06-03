@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { liveQuery } from 'dexie';
 import { dbLocal, type RecepcionProdLocal, type SalidasIncubacionLocal } from '@/lib/db-local';
 import { sincronizarDatos } from '@/lib/sync';
 
@@ -58,26 +59,38 @@ export default function SalidasIncubacionPage() {
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
 
-  const cargarDatos = useCallback(async () => {
+  // Suscripción en vivo. Los lotes son persistentes (descargados de la base);
+  // las salidas son un caché de solo-pendientes que se vacía al sincronizar →
+  // el historial queda en blanco sin necesidad de recargar.
+  useEffect(() => {
     if (!dbLocal) return;
-    try {
+    const sub = liveQuery(async () => {
       const [listLotes, listSalidas] = await Promise.all([
-        dbLocal.recepcion_prod.toArray(),
-        dbLocal.salidas_incubacion.toArray(),
+        dbLocal!.recepcion_prod.toArray(),
+        dbLocal!.salidas_incubacion.toArray(),
       ]);
-      setLotes(listLotes);
-      const enriched = listSalidas.map((s) => ({
-        ...s,
-        codigo_lote:
-          listLotes.find((l) => l.id_local === s.lote_id_local)?.codigo_lote ?? 'Desconocido',
-      }));
-      setSalidas(enriched.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()));
-    } catch (err) {
-      console.error('Error al cargar salidas de incubación:', err);
-    }
+      return { listLotes, listSalidas };
+    }).subscribe({
+      next: ({ listLotes, listSalidas }) => {
+        setLotes(listLotes);
+        const enriched = listSalidas.map((s) => ({
+          ...s,
+          codigo_lote:
+            listLotes.find((l) => l.id_local === s.lote_id_local)?.codigo_lote ?? 'Desconocido',
+        }));
+        setSalidas(
+          enriched.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+        );
+      },
+      error: (err) => console.error('liveQuery salidas de incubación:', err),
+    });
+    return () => sub.unsubscribe();
   }, []);
 
-  useEffect(() => { cargarDatos(); }, [cargarDatos]);
+  // Al entrar, descargar los lotes que crearon otros usuarios.
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.onLine) sincronizarDatos();
+  }, []);
 
   const mostrarMensaje = (texto: string, tipo: string) => {
     setMensaje({ texto, tipo });
@@ -125,7 +138,6 @@ export default function SalidasIncubacionPage() {
       }));
 
       mostrarMensaje('Salida de incubación registrada.', 'success');
-      await cargarDatos();
       if (navigator.onLine) sincronizarDatos();
     } catch (err) {
       console.error('Error al guardar salida:', err);

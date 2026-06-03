@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { liveQuery } from 'dexie';
 import { dbLocal, type RecepcionProdLocal } from '@/lib/db-local';
 import { sincronizarDatos } from '@/lib/sync';
 import { MAESTRO_GRANJAS } from '@/lib/granjas-config';
@@ -124,16 +125,6 @@ export default function RecepcionProdPage() {
   const granjaSeleccionada = MAESTRO_GRANJAS.find((g) => g.id === form.granja);
   const galpones = granjaSeleccionada?.galpones ?? [];
 
-  const cargarLotes = async () => {
-    if (!dbLocal) return;
-    try {
-      const list = await dbLocal.recepcion_prod.toArray();
-      setLotes(list.sort((a, b) => new Date(b.creado_en).getTime() - new Date(a.creado_en).getTime()));
-    } catch (err) {
-      console.error('Error al cargar lotes de producción:', err);
-    }
-  };
-
   const mostrarMensaje = (texto: string, tipo: string) => {
     setMensaje({ texto, tipo });
     setTimeout(() => setMensaje({ texto: '', tipo: '' }), 4000);
@@ -173,7 +164,6 @@ export default function RecepcionProdPage() {
 
       setForm(FORM_DEFAULT);
       mostrarMensaje('Lote de producción registrado.', 'success');
-      await cargarLotes();
       if (navigator.onLine) sincronizarDatos();
     } catch (err: any) {
       const msg =
@@ -186,7 +176,28 @@ export default function RecepcionProdPage() {
     }
   };
 
-  useEffect(() => { cargarLotes(); }, []);
+  // Suscripción en vivo: el estado_sync que actualiza el botón de sincronización
+  // se refleja al instante (verde) sin recargar la página.
+  useEffect(() => {
+    if (!dbLocal) return;
+    const sub = liveQuery(() => dbLocal!.recepcion_prod.toArray()).subscribe({
+      next: (list) =>
+        setLotes(
+          [...list].sort(
+            (a, b) => new Date(b.creado_en).getTime() - new Date(a.creado_en).getTime()
+          )
+        ),
+      error: (err) => console.error('liveQuery lotes de producción:', err),
+    });
+    return () => sub.unsubscribe();
+  }, []);
+
+  // Al entrar, traer del servidor los lotes que crearon otros usuarios.
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      sincronizarDatos();
+    }
+  }, []);
 
   const totalMachos = (Number(form.machos_produccion) || 0) + (Number(form.machos_reemplazo) || 0);
   const totalAves = (Number(form.cant_hembras) || 0) + totalMachos;

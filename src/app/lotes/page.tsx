@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { liveQuery } from 'dexie';
 import { dbLocal, type RecepcionCriaLocal } from '@/lib/db-local';
 import { sincronizarDatos } from '@/lib/sync';
 import type { GranjaConfig } from '@/lib/granjas-config';
 import { useMaestroGranjas } from '@/lib/maestro';
 import DatePickerVE from '@/components/DatePickerVE';
 import SelectVE from '@/components/SelectVE';
+import Tooltip from '@/components/Tooltip';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/Toast';
 
@@ -54,16 +56,73 @@ const inputCls =
 const labelCls =
   'block text-xs font-title font-bold text-slate-500 dark:text-slate-400 mb-1.5';
 
-// ─── Status Dot ───────────────────────────────────────────────────────────────
+// ─── Indicador de sincronización ──────────────────────────────────────────────
+// Ícono de nube (no un simple punto) para que NO se confunda con el estado del
+// lote (Activo/Inactivo). Comunica claramente "subida a la base de datos".
 
-function StatusDot({ estado }: { estado: 'sincronizado' | 'pendiente' | 'error' }) {
-  const cls =
-    estado === 'sincronizado'
-      ? 'bg-emerald-500 shadow-[0_0_5px_#10b981]'
-      : estado === 'pendiente'
-      ? 'bg-amber-400 shadow-[0_0_5px_#f59e0b]'
-      : 'bg-rose-500 shadow-[0_0_5px_#ef4444] animate-pulse';
-  return <span className={`inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 ${cls}`} title={estado} />;
+const SYNC_META: Record<
+  'sincronizado' | 'pendiente' | 'error',
+  { color: string; label: string; path: string; pulse?: boolean }
+> = {
+  sincronizado: {
+    color: 'text-emerald-500',
+    label: 'Sincronizado con la base',
+    // nube con check
+    path: 'M9 12.75 11.25 15 15 9.75M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z',
+  },
+  pendiente: {
+    color: 'text-amber-500',
+    label: 'Pendiente de subir',
+    // nube con flecha arriba
+    path: 'M12 16V9m0 0-2.5 2.5M12 9l2.5 2.5M7 18a4 4 0 0 1-.88-7.9 5 5 0 0 1 9.75-1.06A3.5 3.5 0 1 1 17 18H7z',
+  },
+  error: {
+    color: 'text-rose-500',
+    label: 'Error al sincronizar',
+    // nube con exclamación
+    path: 'M12 9.5v3m0 2.5h.01M7 18a4 4 0 0 1-.88-7.9 5 5 0 0 1 9.75-1.06A3.5 3.5 0 1 1 17 18H7z',
+    pulse: true,
+  },
+};
+
+function SyncIndicator({ estado }: { estado: 'sincronizado' | 'pendiente' | 'error' }) {
+  const meta = SYNC_META[estado] ?? SYNC_META.pendiente;
+  return (
+    <Tooltip label={meta.label}>
+      <svg
+        className={`w-4 h-4 ${meta.color} ${meta.pulse ? 'animate-pulse' : ''} flex-shrink-0`}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+        aria-label={meta.label}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d={meta.path} />
+      </svg>
+    </Tooltip>
+  );
+}
+
+// ─── Chip de estado del lote (Activo / Inactivo) ──────────────────────────────
+
+/** Backward-compat: registros viejos sin el campo se consideran Activos. */
+function esActivo(lote: RecepcionCriaLocal): boolean {
+  return lote.activo !== false;
+}
+
+function EstadoLoteChip({ activo }: { activo: boolean }) {
+  return (
+    <span
+      className={`px-2 py-0.5 rounded-full text-[11px] font-title font-extrabold border inline-flex items-center gap-1.5 flex-shrink-0 ${
+        activo
+          ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/40'
+          : 'bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+      }`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${activo ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+      {activo ? 'Activo' : 'Inactivo'}
+    </span>
+  );
 }
 
 // ─── Tarjeta de Lote ──────────────────────────────────────────────────────────
@@ -77,13 +136,17 @@ interface LoteCardProps {
 function LoteCard({ lote, onEdit, onDelete }: LoteCardProps) {
   const initials = lote.usuario_email ? getInitials(lote.usuario_email) : '??';
   const total = lote.cant_hembras + lote.cant_machos;
+  const activo = esActivo(lote);
 
   return (
-    // fix #2: fila completa, más fino (py-3)
-    // fix #3: fondo #F4F4F4
-    <div className="bg-[#F4F4F4] dark:bg-slate-800/30 border border-theme rounded-xl px-4 py-3 hover:border-[#1067f2]/30 transition-all">
+    // Inactivos: atenuados (transparencia + saturación baja) y van al final.
+    <div
+      className={`bg-[#F4F4F4] dark:bg-slate-800/30 border border-theme rounded-xl px-4 py-3 hover:border-[#1067f2]/30 transition-all ${
+        activo ? '' : 'opacity-55 saturate-50 hover:opacity-80'
+      }`}
+    >
 
-      {/* Fila 1: fecha · lote badge · avatar · status dot · acciones */}
+      {/* Fila 1: fecha · lote badge · estado · avatar · sync · acciones */}
       <div className="flex items-center gap-2 mb-1.5">
         <span className="text-xs font-title font-bold text-slate-400 dark:text-slate-500 flex-shrink-0">
           {formatVE(lote.fecha)}
@@ -94,40 +157,44 @@ function LoteCard({ lote, onEdit, onDelete }: LoteCardProps) {
           Lote {lote.codigo_lote}
         </span>
 
+        {/* Estado del lote (Activo / Inactivo) — concepto distinto del sync */}
+        <EstadoLoteChip activo={activo} />
+
         <div className="flex-1" />
 
-        {/* fix #7: avatar en la fila superior (ya no tapa los totales) */}
-        <div
-          className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-white flex items-center justify-center text-[9px] font-title font-extrabold shadow-sm flex-shrink-0"
-          title={lote.usuario_email}
-        >
-          {initials}
-        </div>
+        {/* Avatar del autor */}
+        <Tooltip label={lote.usuario_email || 'Sin autor'}>
+          <span className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 text-white flex items-center justify-center text-[9px] font-title font-extrabold shadow-sm flex-shrink-0">
+            {initials}
+          </span>
+        </Tooltip>
 
-        <StatusDot estado={lote.estado_sync} />
+        <SyncIndicator estado={lote.estado_sync} />
 
         {/* fix #5: botones editar / borrar */}
-        <button
-          type="button"
-          onClick={() => onEdit(lote)}
-          className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#1067f2] hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors cursor-pointer flex-shrink-0"
-          title="Editar"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-        </button>
+        <Tooltip label="Editar lote">
+          <button
+            type="button"
+            onClick={() => onEdit(lote)}
+            className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#1067f2] hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors cursor-pointer flex-shrink-0"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+        </Tooltip>
 
-        <button
-          type="button"
-          onClick={() => onDelete(lote.id_local)}
-          className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer flex-shrink-0"
-          title="Eliminar"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
+        <Tooltip label="Eliminar lote">
+          <button
+            type="button"
+            onClick={() => onDelete(lote.id_local)}
+            className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer flex-shrink-0"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </Tooltip>
       </div>
 
       {/* Fila 2: Granja · Galpón */}
@@ -225,6 +292,7 @@ function EditModal({
     numero_lote: lote.codigo_lote,
     cant_hembras: String(lote.cant_hembras),
     cant_machos: String(lote.cant_machos),
+    activo: lote.activo !== false,
   });
 
   const granjaSeleccionada = granjas.find((g) => g.id === form.granja);
@@ -239,6 +307,7 @@ function EditModal({
       codigo_lote: form.numero_lote,
       cant_hembras: Number(form.cant_hembras) || 0,
       cant_machos: Number(form.cant_machos) || 0,
+      activo: form.activo,
       estado_sync: 'pendiente',
       actualizado_en: new Date().toISOString(),
     });
@@ -315,6 +384,41 @@ function EditModal({
               />
             </div>
           </div>
+
+          {/* Estado del lote en Cría y Levante — control segmentado */}
+          <div>
+            <label className={labelCls}>Estado del Lote</label>
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-[#F4F4F4] dark:bg-slate-800/40 border border-theme">
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, activo: true })}
+                className={`py-2 rounded-lg text-sm font-title font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  form.activo
+                    ? 'bg-emerald-500 text-white shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-700/40'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${form.activo ? 'bg-white' : 'bg-emerald-500'}`} />
+                Activo
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, activo: false })}
+                className={`py-2 rounded-lg text-sm font-title font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  !form.activo
+                    ? 'bg-slate-500 text-white shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-700/40'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${!form.activo ? 'bg-white' : 'bg-slate-400'}`} />
+                Inactivo
+              </button>
+            </div>
+            <p className="text-[11px] text-muted mt-1.5">
+              Marca <strong>Inactivo</strong> cuando el lote cierre su fase de Cría y Levante.
+            </p>
+          </div>
+
           <div className="flex gap-3 pt-2">
             <button
               type="button"
@@ -357,16 +461,6 @@ export default function RecepcionCriaPage() {
   const granjaSeleccionada = granjas.find((g) => g.id === form.granja);
   const galpones = granjaSeleccionada?.galpones ?? [];
 
-  const cargarLotes = async () => {
-    if (!dbLocal) return;
-    try {
-      const list = await dbLocal.recepcion_cria.toArray();
-      setLotes(list.sort((a, b) => new Date(b.creado_en).getTime() - new Date(a.creado_en).getTime()));
-    } catch (err) {
-      console.error('Error al cargar lotes de cría:', err);
-    }
-  };
-
   const mostrarMensaje = (texto: string, tipo: 'success' | 'error' | 'info' | 'warning') => {
     toast.notify(texto, tipo);
   };
@@ -396,13 +490,13 @@ export default function RecepcionCriaPage() {
         cant_hembras: Number(form.cant_hembras) || 0,
         cant_machos: Number(form.cant_machos) || 0,
         usuario_email: user?.email ?? '',
+        activo: true,
         estado_sync: 'pendiente',
         creado_en: ahora,
         actualizado_en: ahora,
       });
       setForm(FORM_DEFAULT);
       mostrarMensaje('Lote de cría registrado.', 'success');
-      await cargarLotes();
       if (navigator.onLine) sincronizarDatos();
     } catch (err: any) {
       const msg =
@@ -422,7 +516,6 @@ export default function RecepcionCriaPage() {
       await dbLocal.recepcion_cria.update(editLote.id_local, data);
       setEditLote(null);
       mostrarMensaje('Lote actualizado.', 'success');
-      await cargarLotes();
       if (navigator.onLine) sincronizarDatos();
     } catch {
       mostrarMensaje('Error al actualizar el lote.', 'error');
@@ -438,13 +531,34 @@ export default function RecepcionCriaPage() {
       await dbLocal.recepcion_cria.delete(deleteId);
       setDeleteId(null);
       mostrarMensaje('Lote eliminado.', 'success');
-      await cargarLotes();
     } catch {
       mostrarMensaje('Error al eliminar el lote.', 'error');
     }
   };
 
-  useEffect(() => { cargarLotes(); }, []);
+  // Suscripción en vivo: cualquier cambio en Dexie (incluido el estado_sync que
+  // actualiza el botón de sincronización) re-renderiza la lista al instante,
+  // sin necesidad de refrescar la página.
+  useEffect(() => {
+    if (!dbLocal) return;
+    const sub = liveQuery(() => dbLocal!.recepcion_cria.toArray()).subscribe({
+      next: (list) =>
+        setLotes(
+          [...list].sort(
+            (a, b) => new Date(b.creado_en).getTime() - new Date(a.creado_en).getTime()
+          )
+        ),
+      error: (err) => console.error('liveQuery lotes de cría:', err),
+    });
+    return () => sub.unsubscribe();
+  }, []);
+
+  // Al entrar, traer del servidor los lotes que crearon otros usuarios.
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      sincronizarDatos();
+    }
+  }, []);
 
   const totalAlojadas = (Number(form.cant_hembras) || 0) + (Number(form.cant_machos) || 0);
   const loteParaDelete = lotes.find((l) => l.id_local === deleteId) ?? null;
@@ -452,10 +566,14 @@ export default function RecepcionCriaPage() {
   // Granjas únicas presentes en los registros (para los chips de filtro)
   const granjasDisponibles = Array.from(new Set(lotes.map((l) => l.granja).filter(Boolean))).sort();
 
-  // Aplica filtro de granja y ordena por N° de lote DESC
+  // Aplica filtro de granja y ordena: ACTIVOS primero, INACTIVOS al final;
+  // dentro de cada grupo, por N° de lote DESC.
   const lotesVisibles = lotes
     .filter((l) => granjasFiltro.length === 0 || granjasFiltro.includes(l.granja))
     .sort((a, b) => {
+      const aActivo = esActivo(a);
+      const bActivo = esActivo(b);
+      if (aActivo !== bActivo) return aActivo ? -1 : 1; // activos arriba
       const na = parseInt(a.codigo_lote, 10);
       const nb = parseInt(b.codigo_lote, 10);
       if (isNaN(na) && isNaN(nb)) return a.codigo_lote.localeCompare(b.codigo_lote);
@@ -700,17 +818,23 @@ export default function RecepcionCriaPage() {
               </div>
             )}
 
-            {/* Leyenda estados */}
-            <div className="flex items-center gap-4 mb-4 flex-shrink-0 text-[10px] font-title font-bold uppercase tracking-wider text-muted">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />Sincronizado
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Pendiente
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />Error
-              </span>
+            {/* Leyenda de SINCRONIZACIÓN (íconos de nube) — distinta del estado del lote */}
+            <div className="flex items-center gap-3 mb-4 flex-shrink-0 text-[10px] font-title font-bold uppercase tracking-wider text-muted flex-wrap">
+              <span className="text-slate-400 dark:text-slate-500 normal-case">Sincronización:</span>
+              {(['sincronizado', 'pendiente', 'error'] as const).map((e) => (
+                <span key={e} className="flex items-center gap-1.5">
+                  <svg
+                    className={`w-3.5 h-3.5 ${SYNC_META[e].color}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d={SYNC_META[e].path} />
+                  </svg>
+                  {e}
+                </span>
+              ))}
             </div>
 
             {/* Galería con scroll independiente */}

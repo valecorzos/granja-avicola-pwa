@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { liveQuery } from 'dexie';
 import { dbLocal, type RecepcionCriaLocal, type DiarioCriaLocal } from '@/lib/db-local';
 import { sincronizarDatos } from '@/lib/sync';
 
@@ -353,27 +354,39 @@ export default function CriaLevantePage() {
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
 
-  const cargarDatos = useCallback(async () => {
+  // Suscripción en vivo. Los lotes son persistentes (descargados de la base);
+  // los registros diarios son un caché de solo-pendientes que se vacía al
+  // sincronizar → el historial queda en blanco sin necesidad de recargar.
+  useEffect(() => {
     if (!dbLocal) return;
-    try {
+    const sub = liveQuery(async () => {
       const [listLotes, listRegs] = await Promise.all([
-        dbLocal.recepcion_cria.toArray(),
-        dbLocal.diario_cria.toArray(),
+        dbLocal!.recepcion_cria.toArray(),
+        dbLocal!.diario_cria.toArray(),
       ]);
-      setLotes(listLotes);
-      const enriched = listRegs.map((r) => ({
-        ...r,
-        codigo_lote:
-          listLotes.find((l) => l.id_local === r.lote_id_local || (l.id && l.id === r.lote_id))
-            ?.codigo_lote ?? 'Desconocido',
-      }));
-      setRegistros(enriched.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()));
-    } catch (err) {
-      console.error('Error al cargar datos de cría:', err);
-    }
+      return { listLotes, listRegs };
+    }).subscribe({
+      next: ({ listLotes, listRegs }) => {
+        setLotes(listLotes);
+        const enriched = listRegs.map((r) => ({
+          ...r,
+          codigo_lote:
+            listLotes.find((l) => l.id_local === r.lote_id_local || (l.id && l.id === r.lote_id))
+              ?.codigo_lote ?? 'Desconocido',
+        }));
+        setRegistros(
+          enriched.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+        );
+      },
+      error: (err) => console.error('liveQuery datos de cría:', err),
+    });
+    return () => sub.unsubscribe();
   }, []);
 
-  useEffect(() => { cargarDatos(); }, [cargarDatos]);
+  // Al entrar, descargar los lotes que crearon otros usuarios.
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.onLine) sincronizarDatos();
+  }, []);
 
   const mostrarMensaje = (texto: string, tipo: string) => {
     setMensaje({ texto, tipo });
@@ -459,7 +472,6 @@ export default function CriaLevantePage() {
       }));
 
       mostrarMensaje('Registro diario de cría guardado (H + M).', 'success');
-      await cargarDatos();
       if (navigator.onLine) sincronizarDatos();
     } catch (err) {
       console.error('Error al guardar registro diario:', err);
